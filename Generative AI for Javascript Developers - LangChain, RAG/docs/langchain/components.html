@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Key Components of Langchain</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+        background-color: #f4f4f4;
+      }
+      section {
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 20px;
+        background: #fff;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #333;
+      }
+      h2 {
+        color: #444;
+      }
+      code {
+        background-color: #f9f9f9;
+        border-radius: 3px;
+        padding: 0 4px;
+        font-size: 14px;
+        color: #e83e8c;
+      }
+      pre {
+        background-color: #f9f9f9;
+        padding: 12px;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Key Components of Langchain</h1>
+
+      <h2>1. Large Language Models (LLMs)</h2>
+      <p>
+        Large Language Models (LLMs) are the foundation of Langchain. These
+        models, such as GPT-4, are pre-trained on massive datasets, making them
+        capable of understanding and generating human-like text. In Langchain,
+        LLMs are used for tasks such as question-answering, summarization,
+        translation, and more.
+      </p>
+      <p>
+        By abstracting the complexity of interacting with LLMs, Langchain makes
+        it easy to use them within your applications. Whether you need a simple
+        text generator or a more complex reasoning engine, Langchain provides
+        the necessary APIs to interact with LLMs efficiently.
+      </p>
+      <p><strong>Example:</strong></p>
+      <pre><code>
+from langchain.llms import OpenAI
+
+llm = OpenAI(model="gpt-4")
+response = llm.predict("What is Langchain?")
+print(response)
+    </code></pre>
+
+      <h2>2. Chains</h2>
+      <p>
+        Chains are essential to Langchain as they allow developers to create
+        workflows that combine different operations in a sequence. Chains can be
+        as simple as a single step, such as generating a text response using an
+        LLM, or more complex workflows that include multiple steps like querying
+        a database, fetching external data, and then using the LLM to generate a
+        final response.
+      </p>
+      <p>
+        Langchain provides pre-built chains for common use cases, but it also
+        allows developers to create custom chains for specific needs. By
+        chaining tasks together, Langchain supports more complex reasoning,
+        decision-making, and multi-step operations.
+      </p>
+      <h3>Sequential Chains</h3>
+      <p>
+        Sequential chains execute steps one after another. These chains are
+        particularly useful when you need to process input in stages, such as
+        when building a chatbot that first analyzes a user's intent and then
+        fetches relevant data from a knowledge base before providing a response.
+      </p>
+      <pre><code>
+from langchain.chains import SimpleSequentialChain
+from langchain.llms import OpenAI
+
+# Define two separate LLM calls
+llm1 = OpenAI(model="gpt-4")
+llm2 = OpenAI(model="gpt-4")
+
+# Create a sequential chain
+chain = SimpleSequentialChain(llms=[llm1, llm2])
+
+response = chain.run("What is the future of AI?")
+print(response)
+    </code></pre>
+
+      <h3>Map Reduce Chains</h3>
+      <p>
+        Map Reduce Chains are useful for processing large datasets or multiple
+        documents. These chains divide a task into smaller chunks, process them
+        in parallel, and then combine the results. This is especially helpful
+        when summarizing large amounts of text or answering complex questions
+        based on multiple data sources.
+      </p>
+      <pre><code>
+from langchain.chains import MapReduceChain
+from langchain.llms import OpenAI
+
+llm = OpenAI(model="gpt-4")
+
+chain = MapReduceChain(llm=llm)
+
+# Use the MapReduce chain for summarizing multiple documents
+docs = ["Text 1", "Text 2", "Text 3"]
+summary = chain.run(docs)
+print(summary)
+    </code></pre>
+
+      <h3>Conditional Chains</h3>
+      <p>
+        Conditional Chains allow logic-based operations where decisions are made
+        based on specific conditions. For example, you might want to take
+        different actions depending on the type of user input. This flexibility
+        enables Langchain applications to be more dynamic and responsive.
+      </p>
+
+      <h2>3. Agents</h2>
+      <p>
+        Agents in Langchain are specialized chains that have the ability to
+        interact with external systems, such as APIs or databases, to fetch
+        real-time data or perform specific tasks. Agents are particularly useful
+        when your application needs to make decisions or retrieve external
+        information dynamically.
+      </p>
+      <p>Langchain supports different types of agents, including:</p>
+      <ul>
+        <li>
+          <strong>Tool-using agents:</strong> These agents use external tools to
+          fetch information or perform actions based on the context provided by
+          the LLM.
+        </li>
+        <li>
+          <strong>Decision-making agents:</strong> These agents apply reasoning
+          and decision logic to choose among multiple available actions or
+          paths.
+        </li>
+      </ul>
+      <h3>Creating an Agent</h3>
+      <pre><code>
+from langchain.agents import create_tool_agent
+from langchain.tools import WikipediaTool
+
+# Create an agent that uses Wikipedia for information retrieval
+wikipedia_tool = WikipediaTool()
+
+# Create the agent using the tool
+agent = create_tool_agent(tools=[wikipedia_tool])
+
+# Run the agent
+response = agent.run("Who is Albert Einstein?")
+print(response)
+    </code></pre>
+
+      <h2>4. Prompts</h2>
+      <p>
+        Prompts are a crucial part of working with LLMs. A prompt is the input
+        you provide to an LLM to generate a response. In Langchain, you can
+        create custom prompts to guide the model's behavior and achieve the
+        desired output.
+      </p>
+      <p>
+        Langchain provides features to manage and optimize prompts for different
+        applications, whether you are building a conversational agent or
+        performing document summarization. By structuring prompts effectively,
+        you can improve the accuracy and relevance of the model's responses.
+      </p>
+      <h3>Prompt Templates</h3>
+      <p>
+        Langchain allows the creation of <strong>prompt templates</strong> for
+        reusable and dynamic prompts. These templates can be customized at
+        runtime to include variable data, enabling more flexible interactions
+        with LLMs.
+      </p>
+      <pre><code>
+from langchain.prompts import PromptTemplate
+
+template = PromptTemplate(
+    input_variables=["topic"],
+    template="Give me a brief summary about {topic}."
+)
+
+# Fill the template dynamically
+filled_prompt = template.fill(topic="Quantum Computing")
+
+print(filled_prompt)
+# Output: Give me a brief summary about Quantum Computing.
+    </code></pre>
+
+      <h3>Chained Prompts</h3>
+      <p>
+        You can also chain prompts together to create multi-turn conversations
+        or more complex interactions. This allows for more refined control over
+        how each step is handled by the LLM.
+      </p>
+
+      <h2>5. Memory</h2>
+      <p>
+        Memory in Langchain allows the model to retain information across
+        multiple interactions, enabling it to provide coherent and contextually
+        aware responses. This is particularly useful in conversational AI, where
+        the model needs to remember previous user inputs to offer relevant and
+        logical responses.
+      </p>
+      <p>
+        Langchain supports different types of memory, including short-term
+        memory (for immediate context) and long-term memory (for storing and
+        recalling information across sessions). This makes it easier to build
+        intelligent agents that "remember" past interactions and use that
+        knowledge in future responses.
+      </p>
+      <h3>Conversation Memory Example</h3>
+      <pre><code>
+from langchain.memory import ConversationBufferMemory
+
+memory = ConversationBufferMemory()
+
+# Simulate conversation
+memory.add_user_input("What is your name?")
+memory.add_agent_output("I am Langchain Bot.")
+
+print(memory.buffer)
+# Output: {'user_input': 'What is your name?', 'agent_output': 'I am Langchain Bot.'}
+    </code></pre>
+    </section>
+  </body>
+</html>
