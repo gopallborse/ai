@@ -400,4 +400,7 @@ def update_ticket_status(ticket_id: str, new_status: str, updater: str = "System
 
     return f"✅ Successfully updated ticket {ticket_id} status to: {new_status.replace('_', ' ').title()}"
 
-    
+
+if __name__ == "__main__":
+    mcp.run()
+

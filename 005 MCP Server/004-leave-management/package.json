@@ -1,0 +1,15 @@
+{
+  "name": "004-leave-management",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "better-sqlite3": "^13.0.3",
+    "zod": "^4.5.2"
+  }
+}

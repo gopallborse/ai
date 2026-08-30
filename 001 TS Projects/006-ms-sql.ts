@@ -1,4 +1,3 @@
-````ts
 // app.ts
 //
 // Install:
@@ -328,52 +327,51 @@ main().catch((error) => {
   console.error("\nApplication error:", error);
   process.exit(1);
 });
-````
 
-### `.env`
+// `.env`
 
-```env
-GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxx
+// GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxx
 
-DB_SERVER=localhost
-DB_PORT=1433
-DB_USER=sa
-DB_PASSWORD=YourPassword
-DB_NAME=YourDatabase
+// DB_SERVER=localhost
+// DB_PORT=1433
+// DB_USER=sa
+// DB_PASSWORD=YourPassword
+// DB_NAME=YourDatabase
 
-DB_ENCRYPT=false
-DB_TRUST_SERVER_CERTIFICATE=true
-```
+// DB_ENCRYPT=false
+// DB_TRUST_SERVER_CERTIFICATE=true
 
-### Install and run
 
-```bash
-npm install langchain @langchain/core @langchain/groq mssql typeorm dotenv
+// Install and run
 
-npm install -D typescript tsx @types/node
+// bash
+// npm install langchain @langchain/core @langchain/groq mssql typeorm dotenv
 
-npx tsx app.ts
-```
+// npm install -D typescript tsx @types/node
 
-You can then ask things such as:
+// npx tsx app.ts
 
-```text
-How many customers do we have?
 
-Show me the top 10 customers by total sales.
+// You can then ask things such as:
 
-What was our revenue last month?
+// text
 
-Which product generated the highest revenue?
+// How many customers do we have?
 
-How many orders were placed in 2026?
+// Show me the top 10 customers by total sales.
 
-What is the average order value?
-```
+// What was our revenue last month?
 
-### How it works
+// Which product generated the highest revenue?
 
-```text
+// How many orders were placed in 2026?
+
+// What is the average order value?
+
+
+//  How it works
+
+`
                     ┌─────────────────┐
                     │   User question │
                     └────────┬────────┘
@@ -410,10 +408,12 @@ What is the average order value?
                     │ Natural language│
                     │     answer      │
                     └─────────────────┘
-```
+`
 
+/*
 One important design choice here is that **you don't send the entire SQL database to Groq**. The first Groq call sees the schema and generates a query; SQL Server executes that query; then only the returned rows are sent to Groq for the final answer. That's much more scalable and avoids putting your entire database into the LLM context. LangChain's current SQL-agent documentation follows the same general pattern: inspect tables/schema, generate SQL, execute it, and formulate the answer.
 
-`ChatGroq` is the current LangChain JavaScript integration and is installed with `@langchain/groq`; the current LangChain docs show `llama-3.3-70b-versatile` as an example model.
+ChatGroq is the current LangChain JavaScript integration and is installed with @langchain/groq; the current LangChain docs show `llama-3.3-70b-versatile` as an example model.
 
 **For production**, I would make two changes: use a dedicated SQL Server user with **read-only permissions**, and add row limits/timeouts so an LLM-generated query cannot accidentally perform an expensive full-table operation.
+*/
