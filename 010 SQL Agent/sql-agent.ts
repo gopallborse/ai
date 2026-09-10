@@ -1,34 +1,43 @@
 import "dotenv/config";
-import sql from "mssql";
+import odbc from "msnodesqlv8";
+
 import { ChatGroq } from "@langchain/groq";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import {
+  HumanMessage,
+  SystemMessage,
+} from "@langchain/core/messages";
+
 import readline from "readline/promises";
-import { stdin as input, stdout as output } from "process";
+import {
+  stdin as input,
+  stdout as output,
+} from "process";
 
 // ============================================================
 // 1. CONFIGURATION
 // ============================================================
 
-const DB_CONFIG: sql.config = {
-  server: process.env.DB_SERVER || "localhost",
-  port: Number(process.env.DB_PORT || 1433),
+const DB_SERVER =
+  process.env.DB_SERVER || "localhost";
 
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+const DB_PORT =
+  process.env.DB_PORT || "1433";
 
-  database: process.env.DB_NAME,
+const DB_NAME =
+  process.env.DB_NAME || "AdventureWorks2025";
 
-  options: {
-    encrypt: process.env.DB_ENCRYPT === "true",
-    trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE !== "false",
-  },
+// This is the exact connection configuration that was
+// successfully tested directly with msnodesqlv8.
+//
+// Windows Authentication is used through:
+// Trusted_Connection=Yes
 
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
-};
+const DB_CONNECTION_STRING =
+  `Driver={ODBC Driver 18 for SQL Server};` +
+  `Server=${DB_SERVER},${DB_PORT};` +
+  `Database=${DB_NAME};` +
+  `Trusted_Connection=Yes;` +
+  `TrustServerCertificate=Yes;`;
 
 // ============================================================
 // 2. GROQ / LANGCHAIN MODEL
@@ -36,65 +45,149 @@ const DB_CONFIG: sql.config = {
 
 const llm = new ChatGroq({
   apiKey: process.env.GROQ_API_KEY,
-  model: "llama-3.3-70b-versatile",
+  model: "openai/gpt-oss-120b",
   temperature: 0,
 });
 
 // ============================================================
-// 3. SQL CONNECTION
+// 3. DATABASE QUERY HELPER
 // ============================================================
 
-let pool: sql.ConnectionPool;
+interface DatabaseRow {
+  [key: string]: any;
+}
+
+function executeDatabaseQuery(
+  query: string,
+): Promise<DatabaseRow[]> {
+  return new Promise((resolve, reject) => {
+    odbc.query(
+      DB_CONNECTION_STRING,
+      query,
+      (error, rows) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve(rows || []);
+      },
+    );
+  });
+}
 
 // ============================================================
-// 4. GET DATABASE SCHEMA
+// 4. TEST DATABASE CONNECTION
+// ============================================================
+
+async function connectToDatabase(): Promise<void> {
+  console.log(
+    "Connecting to MS SQL Server...",
+  );
+
+  console.log(
+    `Server: ${DB_SERVER}:${DB_PORT}`,
+  );
+
+  console.log(
+    `Database: ${DB_NAME}`,
+  );
+
+  console.log(
+    "Authentication: Windows Authentication",
+  );
+
+  console.log(
+    "ODBC Driver: ODBC Driver 18 for SQL Server",
+  );
+
+  const result = await executeDatabaseQuery(`
+    SELECT
+      @@SERVERNAME AS ServerName,
+      DB_NAME() AS DatabaseName,
+      SUSER_SNAME() AS LoginName
+  `);
+
+  console.log(
+    "Connected to MS SQL Server.",
+  );
+
+  console.log(
+    `SQL Server: ${result[0]?.ServerName}`,
+  );
+
+  console.log(
+    `Database: ${result[0]?.DatabaseName}`,
+  );
+
+  console.log(
+    `Windows Login: ${result[0]?.LoginName}`,
+  );
+}
+
+// ============================================================
+// 5. GET DATABASE SCHEMA
 // ============================================================
 
 async function getDatabaseSchema(): Promise<string> {
-  const result = await pool.request().query(`
-    SELECT
-        TABLE_SCHEMA,
-        TABLE_NAME,
-        COLUMN_NAME,
-        DATA_TYPE
-    FROM INFORMATION_SCHEMA.COLUMNS
-    ORDER BY
-        TABLE_SCHEMA,
-        TABLE_NAME,
-        ORDINAL_POSITION
-  `);
+  const result =
+    await executeDatabaseQuery(`
+      SELECT
+          TABLE_SCHEMA,
+          TABLE_NAME,
+          COLUMN_NAME,
+          DATA_TYPE
+      FROM INFORMATION_SCHEMA.COLUMNS
+      ORDER BY
+          TABLE_SCHEMA,
+          TABLE_NAME,
+          ORDINAL_POSITION
+    `);
 
-  const schema: Record<string, string[]> = {};
+  const schema: Record<
+    string,
+    string[]
+  > = {};
 
-  for (const row of result.recordset) {
-    const table = `${row.TABLE_SCHEMA}.${row.TABLE_NAME}`;
+  for (const row of result) {
+    const table =
+      `${row.TABLE_SCHEMA}.${row.TABLE_NAME}`;
 
     if (!schema[table]) {
       schema[table] = [];
     }
 
-    schema[table].push(`${row.COLUMN_NAME} (${row.DATA_TYPE})`);
+    schema[table].push(
+      `${row.COLUMN_NAME} (${row.DATA_TYPE})`,
+    );
   }
 
   return Object.entries(schema)
     .map(([table, columns]) => {
-      return `TABLE ${table}\n  ${columns.join("\n  ")}`;
+      return (
+        `TABLE ${table}\n` +
+        `  ${columns.join("\n  ")}`
+      );
     })
     .join("\n\n");
 }
 
 // ============================================================
-// 5. GENERATE SQL FROM USER QUESTION
+// 6. GENERATE SQL FROM USER QUESTION
 // ============================================================
 
-async function generateSQL(question: string, schema: string): Promise<string> {
+async function generateSQL(
+  question: string,
+  schema: string,
+): Promise<string> {
   const response = await llm.invoke([
     new SystemMessage(`
       You are an expert Microsoft SQL Server developer.
 
       Your job is to convert a user's natural-language question into ONE safe, read-only SQL Server query.
 
-      DATABASE SCHEMA: ${schema}
+      DATABASE SCHEMA:
+      ${schema}
 
       STRICT RULES:
         1. Generate SELECT queries only.
@@ -112,7 +205,8 @@ async function generateSQL(question: string, schema: string): Promise<string> {
     new HumanMessage(question),
   ]);
 
-  let generatedSQL = String(response.content).trim();
+  let generatedSQL =
+    String(response.content).trim();
 
   // Remove accidental markdown fences.
   generatedSQL = generatedSQL
@@ -125,13 +219,16 @@ async function generateSQL(question: string, schema: string): Promise<string> {
 }
 
 // ============================================================
-// 6. SAFETY CHECK
+// 7. SAFETY CHECK
 // ============================================================
 
 function validateSQL(query: string): void {
   const normalized = query
     .replace(/--.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    )
     .trim()
     .toUpperCase();
 
@@ -140,17 +237,38 @@ function validateSQL(query: string): void {
   }
 
   // Only allow SELECT / WITH queries.
-  if (!normalized.startsWith("SELECT") && !normalized.startsWith("WITH")) {
-    throw new Error("Blocked: only SELECT queries are allowed.");
+  if (
+    !normalized.startsWith("SELECT") &&
+    !normalized.startsWith("WITH")
+  ) {
+    throw new Error(
+      "Blocked: only SELECT queries are allowed.",
+    );
   }
 
-  const forbidden = ["INSERT", "UPDATE", "DELETE", "MERGE", "DROP", "ALTER", "CREATE", "TRUNCATE", "EXEC", "EXECUTE", "GRANT", "REVOKE"];
+  const forbidden = [
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "MERGE",
+    "DROP",
+    "ALTER",
+    "CREATE",
+    "TRUNCATE",
+    "EXEC",
+    "EXECUTE",
+    "GRANT",
+    "REVOKE",
+  ];
 
   for (const keyword of forbidden) {
-    const regex = new RegExp(`\\b${keyword}\\b`);
+    const regex =
+      new RegExp(`\\b${keyword}\\b`);
 
     if (regex.test(normalized)) {
-      throw new Error(`Blocked SQL keyword: ${keyword}`);
+      throw new Error(
+        `Blocked SQL keyword: ${keyword}`,
+      );
     }
   }
 
@@ -161,37 +279,45 @@ function validateSQL(query: string): void {
     .filter(Boolean);
 
   if (statements.length > 1) {
-    throw new Error("Blocked: multiple SQL statements are not allowed.");
+    throw new Error(
+      "Blocked: multiple SQL statements are not allowed.",
+    );
   }
 }
 
 // ============================================================
-// 7. EXECUTE SQL
+// 8. EXECUTE SQL
 // ============================================================
 
-async function executeSQL(query: string): Promise<any[]> {
+async function executeSQL(
+  query: string,
+): Promise<DatabaseRow[]> {
   validateSQL(query);
 
-  if (query.trim().toUpperCase() === "CANNOT_ANSWER") {
+  if (
+    query.trim().toUpperCase() ===
+    "CANNOT_ANSWER"
+  ) {
     return [];
   }
 
   console.log("\nGenerated SQL:");
   console.log(query);
 
-  const result = await pool.request().query(query);
+  const rows =
+    await executeDatabaseQuery(query);
 
-  return result.recordset;
+  return rows;
 }
 
 // ============================================================
-// 8. SEND DATABASE RESULTS TO GROQ
+// 9. SEND DATABASE RESULTS TO GROQ
 // ============================================================
 
 async function answerQuestion(
   question: string,
   sqlQuery: string,
-  rows: any[],
+  rows: DatabaseRow[],
 ): Promise<string> {
   const response = await llm.invoke([
     new SystemMessage(`
@@ -207,12 +333,16 @@ async function answerQuestion(
         5. Do not mention internal implementation details unless the user asks.
         6. Format numbers and dates in a readable way.
 
-      USER QUESTION: ${question}
+      USER QUESTION:
+      ${question}
 
-      SQL QUERY: ${sqlQuery}
+      SQL QUERY:
+      ${sqlQuery}
 
-      DATABASE RESULT: ${JSON.stringify(rows, null, 2)}
+      DATABASE RESULT:
+      ${JSON.stringify(rows, null, 2)}
     `),
+
     new HumanMessage(question),
   ]);
 
@@ -220,70 +350,108 @@ async function answerQuestion(
 }
 
 // ============================================================
-// 9. ASK A QUESTION
+// 10. ASK A QUESTION
 // ============================================================
 
-async function askQuestion(question: string): Promise<void> {
-  console.log("\n----------------------------------------");
-  console.log(`Question: ${question}`);
+async function askQuestion(
+  question: string,
+): Promise<void> {
+  console.log(
+    "\n----------------------------------------",
+  );
+
+  console.log(
+    `Question: ${question}`,
+  );
 
   try {
-    const schema = await getDatabaseSchema();
+    // Get the current database schema.
+    const schema =
+      await getDatabaseSchema();
 
-    const sqlQuery = await generateSQL(question, schema);
+    // Ask Groq to generate SQL.
+    const sqlQuery =
+      await generateSQL(
+        question,
+        schema,
+      );
 
-    if (sqlQuery === "CANNOT_ANSWER") {
+    if (
+      sqlQuery === "CANNOT_ANSWER"
+    ) {
       console.log(
         "\nI cannot answer that question using the available database schema.",
       );
+
       return;
     }
 
-    const rows = await executeSQL(sqlQuery);
+    // Validate and execute generated SQL.
+    const rows =
+      await executeSQL(sqlQuery);
 
-    console.log(`\nRows returned: ${rows.length}`);
+    console.log(
+      `\nRows returned: ${rows.length}`,
+    );
 
-    const answer = await answerQuestion(question, sqlQuery, rows);
+    // Ask Groq to turn the result into
+    // a human-readable answer.
+    const answer =
+      await answerQuestion(
+        question,
+        sqlQuery,
+        rows,
+      );
 
-    console.log("\nAI Answer:");
+    console.log(
+      "\nAI Answer:",
+    );
+
     console.log(answer);
   } catch (error: any) {
-    console.error("\nError:", error?.message || error);
+    console.error(
+      "\nError:",
+      error?.message || error,
+    );
   }
 }
 
 // ============================================================
-// 10. MAIN
+// 11. MAIN
 // ============================================================
 
 async function main() {
   if (!process.env.GROQ_API_KEY) {
-    throw new Error("Missing GROQ_API_KEY environment variable.");
+    throw new Error(
+      "Missing GROQ_API_KEY environment variable.",
+    );
   }
 
-  if (!process.env.DB_USER) {
-    throw new Error("Missing DB_USER environment variable.");
-  }
+  // Test the database connection.
+  await connectToDatabase();
 
-  console.log("Connecting to MS SQL Server...");
+  console.log(
+    "GenAI SQL assistant is ready.",
+  );
 
-  pool = await sql.connect(DB_CONFIG);
-
-  console.log("Connected to MS SQL Server.");
-  console.log("GenAI SQL assistant is ready.");
-
-  const rl = readline.createInterface({
-    input,
-    output,
-  });
+  const rl =
+    readline.createInterface({
+      input,
+      output,
+    });
 
   try {
     while (true) {
-      const question = await rl.question(
-        "\nAsk a question (type 'exit' to quit): ",
-      );
+      const question =
+        await rl.question(
+          "\nAsk a question (type 'exit' to quit): ",
+        );
 
-      if (question.trim().toLowerCase() === "exit") {
+      if (
+        question
+          .trim()
+          .toLowerCase() === "exit"
+      ) {
         break;
       }
 
@@ -295,14 +463,18 @@ async function main() {
     }
   } finally {
     rl.close();
-
-    if (pool) {
-      await pool.close();
-    }
   }
 }
 
+// ============================================================
+// 12. START APPLICATION
+// ============================================================
+
 main().catch((error) => {
-  console.error("\nApplication error:", error);
+  console.error(
+    "\nApplication error:",
+    error,
+  );
+
   process.exit(1);
 });
