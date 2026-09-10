@@ -4,7 +4,7 @@ import { ChatGroq } from "@langchain/groq";
 
 async function chat(question: string) {
     const model = new ChatGroq({
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         apiKey: process.env.GROQ_API_KEY,
         temperature: 1,
     });
